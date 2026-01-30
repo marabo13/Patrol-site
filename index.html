@@ -1,75 +1,122 @@
 <!doctype html>
 <html>
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Patrol Logger</title>
+
   <style>
-    body{font-family:system-ui;margin:40px;background:#0b0214;color:#f7f2ff}
-    .card{max-width:520px;padding:18px;border:1px solid rgba(255,255,255,.15);border-radius:14px;background:rgba(255,255,255,.04)}
-    label{display:block;margin:10px 0 6px;color:#cdb7ff;font-size:13px}
-    input,select{width:100%;padding:10px;border-radius:12px;border:1px solid rgba(255,255,255,.15);background:#0b0114;color:#fff}
-    button{margin-top:14px;width:100%;padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,.18);background:#3a1b6d;color:#fff;font-weight:800;cursor:pointer}
-    .msg{margin-top:10px;color:#cdb7ff;font-size:13px}
+    body{
+      font-family:system-ui;
+      background:#0b0214;
+      color:#f7f2ff;
+      padding:40px;
+    }
+    .card{
+      max-width:500px;
+      margin:auto;
+      padding:20px;
+      border-radius:16px;
+      border:1px solid rgba(255,255,255,.15);
+      background:rgba(255,255,255,.05);
+    }
+    label{
+      display:block;
+      margin-top:12px;
+      font-size:13px;
+      color:#cdb7ff;
+    }
+    input,select{
+      width:100%;
+      padding:10px;
+      margin-top:6px;
+      border-radius:12px;
+      border:1px solid rgba(255,255,255,.15);
+      background:#0b0114;
+      color:#fff;
+    }
+    button{
+      width:100%;
+      margin-top:16px;
+      padding:12px;
+      border-radius:12px;
+      border:1px solid rgba(255,255,255,.2);
+      background:#3a1b6d;
+      color:white;
+      font-weight:800;
+      cursor:pointer;
+    }
+    #status{
+      margin-top:10px;
+      font-size:13px;
+      color:#cdb7ff;
+    }
   </style>
 </head>
+
 <body>
   <div class="card">
-    <h2 style="margin:0 0 6px;">Patrol Logger</h2>
-    <div class="msg">Click to log your patrol to Discord.</div>
+    <h2>Patrol Logger</h2>
 
     <label>Username</label>
-    <input id="user" placeholder="Your Roblox/Discord name">
+    <input id="username" placeholder="Your name">
 
     <label>Rank</label>
     <input id="rank" placeholder="Your rank">
 
-    <label>Patrol type</label>
-    <select id="type">
+    <label>Action</label>
+    <select id="action">
       <option>Start Patrol</option>
       <option>End Patrol</option>
       <option>On Break</option>
       <option>Back From Break</option>
     </select>
 
-    <button id="sendBtn">Send to Discord</button>
-    <div class="msg" id="status"></div>
+    <button onclick="send()">Send to Discord</button>
+    <div id="status"></div>
   </div>
 
-  <script>
-    const btn = document.getElementById("sendBtn");
-    const status = document.getElementById("status");
+<script>
+async function send(){
+  const status = document.getElementById("status");
 
-    btn.addEventListener("click", async () => {
-      const username = document.getElementById("user").value.trim();
-      const rank = document.getElementById("rank").value.trim();
-      const type = document.getElementById("type").value;
+  const username = document.getElementById("username").value.trim();
+  const rank = document.getElementById("rank").value.trim();
+  const action = document.getElementById("action").value;
 
-      if (!username || !rank) {
-        status.textContent = "Fill in username + rank.";
-        return;
-      }
+  if(!username || !rank){
+    status.textContent = "Fill in username and rank.";
+    return;
+  }
 
-      btn.disabled = true;
-      status.textContent = "Sending...";
+  status.textContent = "Sending...";
 
-      try {
-        const res = await fetch("/.netlify/functions/patrol", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ username, rank, type, time: new Date().toISOString() })
-        });
-
-        const data = await res.json();
-        if (!res.ok) throw new Error(data?.error || "Failed");
-
-        status.textContent = "✅ Logged to Discord!";
-      } catch (e) {
-        status.textContent = "❌ Error sending. Check your setup.";
-      } finally {
-        btn.disabled = false;
-      }
+  try{
+    const res = await fetch("/.netlify/functions/patrol", {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({
+        username,
+        rank,
+        action,
+        time: new Date().toISOString()
+      })
     });
-  </script>
+
+    const text = await res.text();
+    let data = {};
+    try{ data = JSON.parse(text); }catch{}
+
+    if(!res.ok){
+      throw new Error(data.error || text || "Error");
+    }
+
+    status.textContent = "✅ Logged to Discord!";
+  }
+  catch(e){
+    status.textContent = "❌ " + e.message;
+  }
+}
+</script>
 </body>
 </html>
