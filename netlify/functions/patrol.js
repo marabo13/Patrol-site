@@ -1,32 +1,40 @@
-export async function handler(event) {
+exports.handler = async (event) => {
   if (event.httpMethod !== "POST") {
-    return { statusCode: 405, body: JSON.stringify({ error: "Method not allowed" }) };
+    return {
+      statusCode: 405,
+      body: JSON.stringify({ error: "Method not allowed" })
+    };
   }
 
+  // 🔴 THIS IS READ FROM NETLIFY (YOU DO NOT EDIT THIS)
   const WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL;
+
   if (!WEBHOOK_URL) {
-    return { statusCode: 500, body: JSON.stringify({ error: "Missing webhook env var" }) };
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ error: "Missing DISCORD_WEBHOOK_URL env var" })
+    };
   }
 
   let body;
   try {
     body = JSON.parse(event.body || "{}");
   } catch {
-    return { statusCode: 400, body: JSON.stringify({ error: "Bad JSON" }) };
+    return {
+      statusCode: 400,
+      body: JSON.stringify({ error: "Invalid JSON" })
+    };
   }
 
-  const username = String(body.username || "").trim();
-  const rank = String(body.rank || "").trim();
-  const type = String(body.type || "Start Patrol");
-  const time = String(body.time || new Date().toISOString());
+  const username = body.username || "Unknown";
+  const rank = body.rank || "Unknown";
+  const action = body.action || "Start Patrol";
+  const time = body.time || new Date().toISOString();
 
-  if (!username || !rank) {
-    return { statusCode: 400, body: JSON.stringify({ error: "Missing username or rank" }) };
-  }
-
+  // 🟢 THIS IS THE DISCORD MESSAGE FORMAT
   const content =
 `🛡️ **Patrol Log**
-**Type:** ${type}
+**Action:** ${action}
 **User:** ${username}
 **Rank:** ${rank}
 **Time:** ${time}`;
@@ -38,8 +46,14 @@ export async function handler(event) {
   });
 
   if (!resp.ok) {
-    return { statusCode: 500, body: JSON.stringify({ error: "Discord webhook failed" }) };
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ error: "Discord webhook failed" })
+    };
   }
 
-  return { statusCode: 200, body: JSON.stringify({ ok: true }) };
-}
+  return {
+    statusCode: 200,
+    body: JSON.stringify({ ok: true })
+  };
+};
