@@ -1,122 +1,169 @@
 <!doctype html>
 <html>
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Patrol Logger</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DCoJ Patrol Logger</title>
 
-  <style>
-    body{
-      font-family:system-ui;
-      background:#0b0214;
-      color:#f7f2ff;
-      padding:40px;
-    }
-    .card{
-      max-width:500px;
-      margin:auto;
-      padding:20px;
-      border-radius:16px;
-      border:1px solid rgba(255,255,255,.15);
-      background:rgba(255,255,255,.05);
-    }
-    label{
-      display:block;
-      margin-top:12px;
-      font-size:13px;
-      color:#cdb7ff;
-    }
-    input,select{
-      width:100%;
-      padding:10px;
-      margin-top:6px;
-      border-radius:12px;
-      border:1px solid rgba(255,255,255,.15);
-      background:#0b0114;
-      color:#fff;
-    }
-    button{
-      width:100%;
-      margin-top:16px;
-      padding:12px;
-      border-radius:12px;
-      border:1px solid rgba(255,255,255,.2);
-      background:#3a1b6d;
-      color:white;
-      font-weight:800;
-      cursor:pointer;
-    }
-    #status{
-      margin-top:10px;
-      font-size:13px;
-      color:#cdb7ff;
-    }
-  </style>
+<style>
+body{
+  margin:0;
+  font-family:system-ui;
+  background:#0b0214;
+  color:#f7f2ff;
+  min-height:100vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:24px;
+}
+.panel{
+  width:100%;
+  max-width:560px;
+  padding:20px;
+  border-radius:18px;
+  border:1px solid rgba(255,255,255,.15);
+  background:rgba(255,255,255,.06);
+}
+label{display:block;margin:10px 0 6px;color:#cdb7ff;font-size:13px}
+input,select,textarea{
+  width:100%;
+  padding:10px;
+  border-radius:12px;
+  border:1px solid rgba(255,255,255,.15);
+  background:#0b0114;
+  color:#fff;
+}
+textarea{min-height:80px}
+button{
+  width:100%;
+  padding:16px;
+  margin-top:12px;
+  border-radius:14px;
+  border:none;
+  font-weight:900;
+  cursor:pointer;
+}
+.start{background:#2ecc71;color:#081b10}
+.end{background:#e74c3c;color:#1a0000}
+.hidden{display:none}
+#status,#live{margin-top:10px;color:#cdb7ff;font-size:13px}
+</style>
 </head>
 
 <body>
-  <div class="card">
-    <h2>Patrol Logger</h2>
+<div class="panel">
+  <h2>DCoJ Patrol Logger</h2>
 
-    <label>Username</label>
-    <input id="username" placeholder="Your name">
+  <label>Username</label>
+  <input id="username">
 
-    <label>Rank</label>
-    <input id="rank" placeholder="Your rank">
+  <label>DCoJ Enforcement Rank</label>
+  <select id="rank">
+    <option value="">-- Select rank --</option>
+    <option>Arbiter</option>
+    <option>Quaestor</option>
+    <option>Praetor</option>
+    <option>Sanctor</option>
+    <option>Ast. Chief Arbiter</option>
+    <option>Chief Arbiter</option>
+  </select>
 
-    <label>Action</label>
-    <select id="action">
-      <option>Start Patrol</option>
-      <option>End Patrol</option>
-      <option>On Break</option>
-      <option>Back From Break</option>
-    </select>
-
-    <button onclick="send()">Send to Discord</button>
-    <div id="status"></div>
+  <div id="mentorBlock" class="hidden">
+    <label>Supervised by (Quaestor Mentor)</label>
+    <input id="mentor">
   </div>
 
+  <button class="start" id="startBtn">🟢 START PATROL</button>
+  <button class="end" id="endBtn" disabled>🔴 END PATROL</button>
+
+  <div id="status"></div>
+  <div id="live"></div>
+</div>
+
 <script>
-async function send(){
-  const status = document.getElementById("status");
+const WEBHOOK_URL = "PUT_YOUR_DISCORD_WEBHOOK_URL_HERE";
 
-  const username = document.getElementById("username").value.trim();
-  const rank = document.getElementById("rank").value.trim();
-  const action = document.getElementById("action").value;
+const S={start:"pStart",user:"pUser",rank:"pRank",mentor:"pMentor"};
+const $=id=>document.getElementById(id);
 
-  if(!username || !rank){
-    status.textContent = "Fill in username and rank.";
-    return;
-  }
+function save(k,v){localStorage.setItem(k,v)}
+function load(k){return localStorage.getItem(k)}
+function del(k){localStorage.removeItem(k)}
 
-  status.textContent = "Sending...";
-
-  try{
-    const res = await fetch("/.netlify/functions/patrol", {
-      method: "POST",
-      headers: {"Content-Type":"application/json"},
-      body: JSON.stringify({
-        username,
-        rank,
-        action,
-        time: new Date().toISOString()
-      })
-    });
-
-    const text = await res.text();
-    let data = {};
-    try{ data = JSON.parse(text); }catch{}
-
-    if(!res.ok){
-      throw new Error(data.error || text || "Error");
-    }
-
-    status.textContent = "✅ Logged to Discord!";
-  }
-  catch(e){
-    status.textContent = "❌ " + e.message;
-  }
+function fmt(ms){
+  const s=Math.floor(ms/1000),h=Math.floor(s/3600),
+        m=Math.floor((s%3600)/60),r=s%60;
+  return h?`${h}h ${m}m ${r}s`:m?`${m}m ${r}s`:`${r}s`;
 }
+
+function refresh(){
+  $("mentorBlock").classList.toggle("hidden",$("rank").value!=="Arbiter");
+  const on=!!load(S.start);
+  $("startBtn").disabled=on;
+  $("endBtn").disabled=!on;
+  $("live").textContent=on
+    ?`On patrol • ${fmt(Date.now()-new Date(load(S.start)))}`
+    :"Not on patrol.";
+}
+
+async function sendEmbed(embed){
+  await fetch(WEBHOOK_URL,{
+    method:"POST",
+    headers:{ "Content-Type":"application/json" },
+    body:JSON.stringify({embeds:[embed]})
+  });
+}
+
+$("startBtn").onclick=async()=>{
+  const u=$("username").value.trim();
+  const r=$("rank").value;
+  const m=$("mentor").value.trim();
+  if(!u||!r) return $("status").textContent="❌ Username & rank required.";
+  if(r==="Arbiter"&&!m) return $("status").textContent="❌ Arbiter requires Quaestor mentor.";
+
+  const t=new Date().toISOString();
+  save(S.start,t); save(S.user,u); save(S.rank,r); if(m) save(S.mentor,m);
+
+  await sendEmbed({
+    title:"🟢 Patrol Started",
+    color:0x2ecc71,
+    fields:[
+      {name:"Officer",value:`**${u}**`,inline:true},
+      {name:"Rank",value:`**${r}**`,inline:true},
+      ...(r==="Arbiter"?[{name:"Supervised by",value:`**Quaestor ${m}**`}]:[]),
+      {name:"Start",value:`\`${t}\``}
+    ],
+    timestamp:t
+  });
+
+  $("status").textContent="✅ Patrol started.";
+  refresh();
+};
+
+$("endBtn").onclick=async()=>{
+  const end=new Date().toISOString();
+  const start=load(S.start);
+  const duration=fmt(new Date(end)-new Date(start));
+
+  await sendEmbed({
+    title:"🔴 Patrol Ended",
+    color:0xe74c3c,
+    fields:[
+      {name:"Officer",value:`**${load(S.user)}**`,inline:true},
+      {name:"Rank",value:`**${load(S.rank)}**`,inline:true},
+      {name:"Duration",value:`**${duration}**`},
+    ],
+    timestamp:end
+  });
+
+  del(S.start);
+  $("status").textContent="✅ Patrol ended.";
+  refresh();
+};
+
+$("rank").onchange=refresh;
+refresh(); setInterval(refresh,1000);
 </script>
 </body>
 </html>
